@@ -144,6 +144,15 @@ terraform destroy
 
 Projekt zawiera przykład pipeline GitHub Actions (`github_actions_prezentacja.md`). Backend Terraform state na GCS — bucket i prefix przekazywane przez `-backend-config` w CI.
 
+### Wykrywanie driftu
+
+Workflow `.github/workflows/drift.yml` codziennie (i na żądanie z zakładki Actions) porównuje state Terraforma z rzeczywistym stanem w GCP (`terraform plan -refresh-only`). Gdy znajdzie różnice, otwiera lub aktualizuje issue z etykietą `drift`; gdy różnice znikną, zamyka je. Niczego nie naprawia sam:
+
+- zmiana w GCP była pomyłką — uruchom `terraform apply`, żeby przywrócić stan z kodu,
+- zmiana w GCP była celowa — przenieś ją do plików `.tf` zwykłym PR-em.
+
+Usunięcie klastra przez `idle_delete_ttl` jest traktowane jako stan oczekiwany i nie otwiera issue.
+
 ## Materiały szkoleniowe
 
 - `prezentacja.md` — slajdy szkolenia: Terraform, GCP, architektura Spark, demo
