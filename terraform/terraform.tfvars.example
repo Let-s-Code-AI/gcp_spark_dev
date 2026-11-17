@@ -9,4 +9,4 @@ cluster_name   = "spark-training-cluster"
 num_workers    = 2
 master_machine = "n1-standard-2"
 worker_machine = "n1-standard-2"
-spark_version  = "2.1-debian12"
+spark_version  = "2.2-debian12"

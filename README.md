@@ -8,7 +8,7 @@ Projekt szkoleniowy DevOps — mini klaster **Apache Spark** na **Google Cloud P
 |---|---|
 | IaC | Terraform >= 1.5, provider `hashicorp/google ~> 5.0` |
 | Sieć | VPC, subnet, firewall (bez publicznych IP, IAP Tunnel) |
-| Obliczenia | GCP Dataproc (Spark 3.4 / obraz `2.1-debian12`) |
+| Obliczenia | GCP Dataproc (Spark 3.5 / obraz `2.2-debian12`) |
 | Pamięć | Cloud Storage (staging bucket + data bucket) |
 | Region | `europe-central2` (Warszawa) |
 
@@ -128,7 +128,7 @@ terraform destroy
 | `num_workers` | `2` | Liczba węzłów worker |
 | `master_machine` | `n1-standard-2` | Typ maszyny mastera |
 | `worker_machine` | `n1-standard-2` | Typ maszyny workerów |
-| `spark_version` | `2.1-debian12` | Obraz Dataproc (Spark 3.4, Hadoop 3.3) |
+| `spark_version` | `2.2-debian12` | Obraz Dataproc (Spark 3.5, Hadoop 3.3) |
 
 ## Outputy Terraform
 
