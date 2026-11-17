@@ -1,0 +1,70 @@
+# Konfiguracja OpenTelemetry Collector (dystrybucja contrib) na węzłach Dataproc.
+# Plik trafia do GCS przez Terraform, a init action kopiuje go do
+# /etc/otelcol-contrib/config.yaml na każdym węźle.
+
+receivers:
+  # Telemetria z kodu joba (scripts/word_count.py) — tylko z tego samego węzła
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 127.0.0.1:4317
+      http:
+        endpoint: 127.0.0.1:4318
+
+  # Metryki maszyny: CPU, load, pamięć, dysk, sieć
+  hostmetrics:
+    collection_interval: 60s
+    scrapers:
+      cpu:
+      load:
+      memory:
+      filesystem:
+      network:
+
+processors:
+  # Collector nie może zabrać pamięci executorom Sparka
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 200
+    spike_limit_mib: 50
+
+  # Strefa, projekt i nazwa hosta z metadata servera GCE
+  resource_detection:
+    detectors: [gcp]
+    timeout: 10s
+
+  # Managed Prometheus wymaga etykiet job / instance / cluster:
+  #   job      <- service.name
+  #   instance <- service.instance.id
+  #   cluster  <- cluster
+  resource:
+    attributes:
+      - key: cluster
+        value: ${env:DATAPROC_CLUSTER_NAME}
+        action: upsert
+      - key: service.name
+        value: dataproc-node
+        action: insert # nie nadpisuj nazwy ustawionej przez aplikację
+      - key: service.instance.id
+        from_attribute: host.name
+        action: upsert
+
+exporters:
+  # Metryki -> Google Cloud Managed Service for Prometheus
+  googlemanagedprometheus:
+    sending_queue:
+      batch:
+
+  # Ślady -> Cloud Trace
+  googlecloud:
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp, hostmetrics]
+      processors: [memory_limiter, resource_detection, resource]
+      exporters: [googlemanagedprometheus]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource_detection, resource]
+      exporters: [googlecloud]
