@@ -1,0 +1,79 @@
+name: Terraform Drift Detection
+
+# Sprawdza, czy stan w GCP różni się od state Terraforma (np. po zmianach
+# wyklikanych w konsoli). Niczego nie naprawia — otwiera issue z etykietą `drift`.
+
+on:
+  schedule:
+    - cron: "17 5 * * *" # codziennie 05:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # wymagane do Workload Identity Federation
+  issues: write
+
+jobs:
+  drift:
+    name: Detect drift
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+          terraform_wrapper: false # czysty stdout dla `terraform show -json`
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="prefix=terraform/state"
+
+      # -refresh-only porównuje state z GCP, niczego nie zmienia i nie zapisuje.
+      - name: Terraform Plan (refresh-only)
+        run: |
+          terraform plan -refresh-only -lock=false -no-color \
+            -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
+            -out=drift.tfplan
+          terraform show -json drift.tfplan > drift.json
+
+      # Klaster Dataproc pomijamy: kasuje się sam po idle_delete_ttl,
+      # więc bez tego issue otwierałoby się co noc.
+      - name: Open or close drift issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          drift="$(jq -r '.resource_drift[]? | select(.type != "google_dataproc_cluster") | "- `\(.address)`"' drift.json)"
+          issue="$(gh issue list --label drift --state open --json number --jq '.[0].number')"
+
+          if [ -z "$drift" ]; then
+            echo "Brak driftu."
+            if [ -n "$issue" ]; then
+              gh issue close "$issue" --comment "Drift zniknął: $RUN_URL"
+            fi
+            exit 0
+          fi
+
+          body="$(printf 'Stan w GCP różni się od state Terraforma:\n\n%s\n\nSzczegóły w logu: %s\n' "$drift" "$RUN_URL")"
+          if [ -n "$issue" ]; then
+            gh issue edit "$issue" --body "$body"
+          else
+            gh label create drift --color d93f0b --force
+            gh issue create --title "Terraform drift" --label drift --body "$body"
+          fi

@@ -8,7 +8,7 @@ Projekt szkoleniowy DevOps — mini klaster **Apache Spark** na **Google Cloud P
 |---|---|
 | IaC | Terraform >= 1.5, provider `hashicorp/google ~> 5.0` |
 | Sieć | VPC, subnet, firewall (bez publicznych IP, IAP Tunnel) |
-| Obliczenia | GCP Dataproc (Spark 3.4 / obraz `2.1-debian12`) |
+| Obliczenia | GCP Dataproc (Spark 3.5 / obraz `2.2-debian12`) |
 | Pamięć | Cloud Storage (staging bucket + data bucket) |
 | Region | `europe-central2` (Warszawa) |
 
@@ -128,7 +128,7 @@ terraform destroy
 | `num_workers` | `2` | Liczba węzłów worker |
 | `master_machine` | `n1-standard-2` | Typ maszyny mastera |
 | `worker_machine` | `n1-standard-2` | Typ maszyny workerów |
-| `spark_version` | `2.1-debian12` | Obraz Dataproc (Spark 3.4, Hadoop 3.3) |
+| `spark_version` | `2.2-debian12` | Obraz Dataproc (Spark 3.5, Hadoop 3.3) |
 
 ## Outputy Terraform
 
@@ -143,6 +143,15 @@ terraform destroy
 ## CI/CD
 
 Projekt zawiera przykład pipeline GitHub Actions (`github_actions_prezentacja.md`). Backend Terraform state na GCS — bucket i prefix przekazywane przez `-backend-config` w CI.
+
+### Wykrywanie driftu
+
+Workflow `.github/workflows/drift.yml` codziennie (i na żądanie z zakładki Actions) porównuje state Terraforma z rzeczywistym stanem w GCP (`terraform plan -refresh-only`). Gdy znajdzie różnice, otwiera lub aktualizuje issue z etykietą `drift`; gdy różnice znikną, zamyka je. Niczego nie naprawia sam:
+
+- zmiana w GCP była pomyłką — uruchom `terraform apply`, żeby przywrócić stan z kodu,
+- zmiana w GCP była celowa — przenieś ją do plików `.tf` zwykłym PR-em.
+
+Usunięcie klastra przez `idle_delete_ttl` jest traktowane jako stan oczekiwany i nie otwiera issue.
 
 ## Materiały szkoleniowe
 

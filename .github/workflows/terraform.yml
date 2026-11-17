@@ -1,18 +1,16 @@
 name: Terraform CI/CD
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "terraform/**"
-      - "scripts/**"
-      - ".github/workflows/terraform.yml"
-  pull_request:
-    branches: [main]
-    paths:
-      - "terraform/**"
-      - "scripts/**"
-      - ".github/workflows/terraform.yml"
+  workflow_dispatch:
+    inputs:
+      run_apply:
+        description: "Uruchom terraform apply (wymaga zatwierdzenia w environment production)"
+        type: boolean
+        default: false
+      run_spark_job:
+        description: "Wyślij job PySpark na klaster"
+        type: boolean
+        default: false
 
 env:
   TF_VERSION: "1.9.0"
@@ -20,7 +18,7 @@ env:
 
 permissions:
   contents: read
-  id-token: write   # wymagane do Workload Identity Federation
+  id-token: write  
   pull-requests: write
 
 jobs:
@@ -80,7 +78,7 @@ jobs:
       - name: Ruff format check
         run: ruff format --check scripts/
 
-  # ── 1. Validate & Plan (każdy PR i push) ───────────────────────────────────
+  # ── 1. Validate & Plan (każde uruchomienie) ────────────────────────────────
   plan:
     name: Terraform Plan
     runs-on: ubuntu-latest
@@ -144,12 +142,15 @@ jobs:
           path: ${{ env.WORKING_DIR }}/tfplan
           retention-days: 1
 
-  # ── 2. Apply (tylko merge do main) ─────────────────────────────────────────
+  # ── 2. Apply (ręcznie z run_apply, tylko na main) ──────────────────────────
   apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
     needs: plan
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && inputs.run_apply))
     environment: production   # wymaga manualnego zatwierdzenia w GitHub
 
     defaults:
@@ -192,12 +193,22 @@ jobs:
       - name: Show Outputs
         run: terraform output
 
-  # ── 3. Submit Spark Job (opcjonalnie, po apply) ─────────────────────────────
+  # ── 3. Submit Spark Job (ręcznie z run_spark_job, tylko na main) ────────────
+  # !cancelled() jest potrzebne, żeby job mógł ruszyć przy pominiętym apply
+  # (dispatch z samym run_spark_job). Nieudany lub odrzucony apply blokuje job.
   spark-job:
     name: Submit Spark Job
     runs-on: ubuntu-latest
-    needs: apply
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [plan, apply]
+    if: >-
+      !cancelled() &&
+      github.ref == 'refs/heads/main' &&
+      needs.plan.result == 'success' &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && inputs.run_spark_job)) &&
+      (needs.apply.result == 'success' ||
+       (needs.apply.result == 'skipped' &&
+        github.event_name == 'workflow_dispatch' && !inputs.run_apply))
 
     steps:
       - name: Checkout
