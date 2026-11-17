@@ -10,6 +10,7 @@ Projekt szkoleniowy DevOps — mini klaster **Apache Spark** na **Google Cloud P
 | Sieć | VPC, subnet, firewall (bez publicznych IP, IAP Tunnel) |
 | Obliczenia | GCP Dataproc (Spark 3.5 / obraz `2.2-debian12`) |
 | Pamięć | Cloud Storage (staging bucket + data bucket) |
+| Obserwowalność | OpenTelemetry Collector → Managed Service for Prometheus + Cloud Trace, Grafana na Cloud Run |
 | Region | `europe-central2` (Warszawa) |
 
 ## Architektura
@@ -53,7 +54,8 @@ gcp_spark/
 │   └── modules/
 │       ├── network/         ← VPC, subnet, firewall
 │       ├── storage/         ← buckety GCS, service account
-│       └── dataproc/        ← klaster Spark
+│       ├── dataproc/        ← klaster Spark
+│       └── observability/   ← OpenTelemetry Collector, Grafana na Cloud Run
 └── scripts/
     ├── word_count.py        ← przykładowy job PySpark
     └── submit_job.sh        ← skrypt do uruchomienia joba
@@ -108,7 +110,16 @@ terraform output spark_ui_port_forward
 - `localhost:4040` — Spark UI (joby, DAG, executory)
 - `localhost:8080` — YARN ResourceManager
 
-### 5. Usunięcie klastra
+### 5. Grafana
+
+```bash
+# Polecenie z outputu Terraform — otwiera Grafanę na http://localhost:3000
+terraform output -raw grafana_proxy
+```
+
+Dashboard **Klaster Spark (Dataproc)** otwiera się jako strona startowa. Szczegóły w sekcji [Obserwowalność](#obserwowalność).
+
+### 6. Usunięcie klastra
 
 ```bash
 terraform destroy
@@ -129,6 +140,7 @@ terraform destroy
 | `master_machine` | `n1-standard-2` | Typ maszyny mastera |
 | `worker_machine` | `n1-standard-2` | Typ maszyny workerów |
 | `spark_version` | `2.2-debian12` | Obraz Dataproc (Spark 3.5, Hadoop 3.3) |
+| `grafana_invokers` | `[]` | Dodatkowi członkowie IAM z dostępem do Grafany (np. `user:jan@example.com`) |
 
 ## Outputy Terraform
 
@@ -139,6 +151,33 @@ terraform destroy
 | `staging_bucket` | Bucket GCS dla Dataproc |
 | `data_bucket` | Bucket GCS na dane i wyniki |
 | `spark_ui_port_forward` | Gotowe polecenie SSH tunnel do Spark UI |
+| `grafana_url` | Adres Grafany na Cloud Run (wymaga uwierzytelnienia IAM) |
+| `grafana_proxy` | Gotowe polecenie otwierające Grafanę na `localhost:3000` |
+
+## Obserwowalność
+
+```
+węzły Dataproc                            poza klastrem (trwałe)
+┌───────────────────────────┐
+│ word_count.py ──OTLP──┐   │
+│                       ▼   │          ┌────────────────────┐      ┌─────────────────────┐
+│ hostmetrics ──▶ otelcol ──┼────────▶ │ Managed Prometheus │ ◀─── │ Grafana (Cloud Run) │
+└───────────────────────────┘          │ + Cloud Trace      │      └─────────────────────┘
+                                       └────────────────────┘
+```
+
+Całość jest w module `terraform/modules/observability`:
+
+- **OpenTelemetry Collector** (`otelcol-contrib`, usługa systemd) działa na każdym węźle. Zbiera metryki maszyny (CPU, pamięć, dysk, sieć) i przyjmuje OTLP na `localhost:4317` / `4318`. Konfiguracja: `files/otel/collector-config.yaml`.
+- **Metryki** trafiają do Google Cloud Managed Service for Prometheus, **ślady** do Cloud Trace. Ruch idzie przez Private Google Access, bez NAT.
+- **Job `word_count.py`** wysyła do collectora spany (`word_count` → `count_words`, `save_output`) oraz metryki `wordcount.distinct_words` i `wordcount.duration`. Bez collectora albo bibliotek OpenTelemetry job działa normalnie, tylko bez telemetrii.
+- **Grafana** działa na Cloud Run i skaluje się do zera (pierwsze wejście po przerwie trwa kilkanaście sekund). Datasource i dashboardy są w repo (`files/grafana/`) i montowane z bucketu GCS — zmiany wyklikane w Grafanie znikają przy restarcie, więc trwałe zmiany rób w plikach.
+
+Dostęp do Grafany chroni IAM Cloud Run (`roles/run.invoker`); sama Grafana nie pyta o hasło. Owner i Editor projektu mają dostęp od razu, pozostałych dopisz w `grafana_invokers`.
+
+Węzły nie mają wyjścia do internetu, więc paczkę collectora i biblioteki Pythona pobiera maszyna wykonująca `terraform apply` (skrypt `files/otel/upload_artifacts.sh`, wymaga `curl`, `python3` z `pip` i `gcloud`) i wgrywa je do bucketu data. Init action instaluje je stamtąd przy tworzeniu klastra. Błąd instalacji nie blokuje klastra — szukaj wtedy wpisów `[otel]` w logu init action w buckecie staging.
+
+Wersje (collector, biblioteki OpenTelemetry, obraz Grafany) są przypięte w `locals` modułu. Zmiana konfiguracji collectora trafia na węzły dopiero przy następnym utworzeniu klastra.
 
 ## CI/CD
 
