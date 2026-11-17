@@ -1,11 +1,6 @@
 name: Terraform Drift Detection
 
-# Sprawdza, czy stan w GCP różni się od state Terraforma (np. po zmianach
-# wyklikanych w konsoli). Niczego nie naprawia — otwiera issue z etykietą `drift`.
-
 on:
-  schedule:
-    - cron: "17 5 * * *" # codziennie 05:17 UTC
   workflow_dispatch:
 
 permissions:
