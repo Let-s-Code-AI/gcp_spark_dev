@@ -1,4 +1,8 @@
 # Dashboardy jako kod: Grafana wczytuje pliki JSON z katalogu json/.
+#
+# Każdy target PromQL musi mieć obok promQLQuery także (pusty) timeSeriesList.
+# Bez niego Grafana uznaje zapytanie za "legacy", zamienia je na timeSeriesList
+# bez metryki i po cichu go nie wysyła — panel pokazuje "No data".
 apiVersion: 1
 
 providers:

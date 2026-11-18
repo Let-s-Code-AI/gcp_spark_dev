@@ -66,9 +66,14 @@
             "uid": "gcm"
           },
           "queryType": "promQL",
+          "timeSeriesList": {
+            "projectName": "__PROJECT_ID__",
+            "filters": [],
+            "view": "FULL"
+          },
           "promQLQuery": {
             "projectName": "__PROJECT_ID__",
-            "expr": "1 - avg by (instance) (rate(system_cpu_time_seconds_total{state=\"idle\"}[5m]))",
+            "expr": "1 - sum by (instance) (rate(system_cpu_time_seconds_total{state=\"idle\"}[5m])) / sum by (instance) (system_cpu_logical_count)",
             "step": "60s"
           }
         }
@@ -104,6 +109,11 @@
             "uid": "gcm"
           },
           "queryType": "promQL",
+          "timeSeriesList": {
+            "projectName": "__PROJECT_ID__",
+            "filters": [],
+            "view": "FULL"
+          },
           "promQLQuery": {
             "projectName": "__PROJECT_ID__",
             "expr": "sum by (instance) (system_memory_usage_bytes{state=\"used\"})",
@@ -142,6 +152,11 @@
             "uid": "gcm"
           },
           "queryType": "promQL",
+          "timeSeriesList": {
+            "projectName": "__PROJECT_ID__",
+            "filters": [],
+            "view": "FULL"
+          },
           "promQLQuery": {
             "projectName": "__PROJECT_ID__",
             "expr": "system_cpu_load_average_1m",
@@ -180,6 +195,11 @@
             "uid": "gcm"
           },
           "queryType": "promQL",
+          "timeSeriesList": {
+            "projectName": "__PROJECT_ID__",
+            "filters": [],
+            "view": "FULL"
+          },
           "promQLQuery": {
             "projectName": "__PROJECT_ID__",
             "expr": "sum by (instance, direction) (rate(system_network_io_bytes_total[5m]))",
@@ -218,6 +238,11 @@
             "uid": "gcm"
           },
           "queryType": "promQL",
+          "timeSeriesList": {
+            "projectName": "__PROJECT_ID__",
+            "filters": [],
+            "view": "FULL"
+          },
           "promQLQuery": {
             "projectName": "__PROJECT_ID__",
             "expr": "sum by (instance) (system_filesystem_usage_bytes{mountpoint=\"/\", state=\"used\"})",
@@ -269,6 +294,11 @@
             "uid": "gcm"
           },
           "queryType": "promQL",
+          "timeSeriesList": {
+            "projectName": "__PROJECT_ID__",
+            "filters": [],
+            "view": "FULL"
+          },
           "promQLQuery": {
             "projectName": "__PROJECT_ID__",
             "expr": "sum by (status) (dataproc_googleapis_com:cluster_yarn_memory_size)",
@@ -307,6 +337,11 @@
             "uid": "gcm"
           },
           "queryType": "promQL",
+          "timeSeriesList": {
+            "projectName": "__PROJECT_ID__",
+            "filters": [],
+            "view": "FULL"
+          },
           "promQLQuery": {
             "projectName": "__PROJECT_ID__",
             "expr": "sum by (status) (dataproc_googleapis_com:cluster_yarn_nodemanagers)",
@@ -358,6 +393,11 @@
             "uid": "gcm"
           },
           "queryType": "promQL",
+          "timeSeriesList": {
+            "projectName": "__PROJECT_ID__",
+            "filters": [],
+            "view": "FULL"
+          },
           "promQLQuery": {
             "projectName": "__PROJECT_ID__",
             "expr": "max(wordcount_distinct_words)",
@@ -396,6 +436,11 @@
             "uid": "gcm"
           },
           "queryType": "promQL",
+          "timeSeriesList": {
+            "projectName": "__PROJECT_ID__",
+            "filters": [],
+            "view": "FULL"
+          },
           "promQLQuery": {
             "projectName": "__PROJECT_ID__",
             "expr": "sum(wordcount_duration_seconds_sum) / sum(wordcount_duration_seconds_count)",
