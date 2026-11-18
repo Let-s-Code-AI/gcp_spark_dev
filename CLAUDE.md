@@ -63,14 +63,13 @@ Nowa zmienna konfigurowalna przechodzi przez: `terraform/variables.tf` → przek
 
 ### Pipeline CI (`.github/workflows/terraform.yml`)
 
-`lint` → `plan` → `apply` → `spark-job`. Workflow uruchamia się wyłącznie ręcznie (`workflow_dispatch`) — nie reaguje na push ani PR. Sam dispatch robi tylko lint i plan; `apply` i `spark-job` ruszają tylko na `main` z zaznaczonym inputem (`run_apply`, `run_spark_job` — niezależne, domyślnie wyłączone), a `apply` wymaga ręcznego zatwierdzenia w environment `production`. Apply wykonuje zapisany artefakt `tfplan` z joba plan — bez `terraform refresh` przed nim, bo refresh zapisuje nową wersję state i unieważnia zapisany plan („Saved plan is stale”). Uwierzytelnianie do GCP przez Workload Identity Federation (sekrety `WIF_PROVIDER`, `WIF_SERVICE_ACCOUNT`, `TF_STATE_BUCKET`, `GCP_PROJECT_ID`).
+`lint` → `plan` → `apply` → `spark-job`. Workflow uruchamia się wyłącznie ręcznie (`workflow_dispatch`) — nie reaguje na push ani PR. Sam dispatch robi tylko lint i plan; `apply` i `spark-job` ruszają tylko na `main` z zaznaczonym inputem (`run_apply`, `run_spark_job` — niezależne, domyślnie wyłączone), a `apply` wymaga ręcznego zatwierdzenia w environment `production`. Apply wykonuje zapisany artefakt `tfplan` z joba plan — bez `terraform refresh` przed nim, bo refresh zapisuje nową wersję state i unieważnia zapisany plan („Saved plan is stale”). Job `spark-job` odczytuje `data_bucket` i `cluster_name` z `terraform output` i wywołuje `scripts/submit_job.sh`. Uwierzytelnianie do GCP przez Workload Identity Federation (sekrety `WIF_PROVIDER`, `WIF_SERVICE_ACCOUNT`, `TF_STATE_BUCKET`, `GCP_PROJECT_ID`).
 ### Wykrywanie driftu (`.github/workflows/drift.yml`)
 
 Codziennie (cron) i na żądanie (`workflow_dispatch`) robi `terraform plan -refresh-only -lock=false` i utrzymuje jedno issue z etykietą `drift`: tworzy je, aktualizuje i zamyka, gdy drift zniknie. Niczego nie naprawia i nie zapisuje state. Drift na `google_dataproc_cluster` jest pomijany (filtr `jq` w ostatnim kroku), bo klaster kasuje się sam po `idle_delete_ttl`.
 
 ## Znane niespójności
 
-- Job `spark-job` w CI wgrywa skrypt do `gs://<PROJECT_ID>-spark-staging-dev/...`, co nie odpowiada nazwie bucketu tworzonej przez `modules/storage`, i wywołuje `word_count.py` bez argumentów, których skrypt wymaga (dokładnie 2: input, output). Poprawne wywołanie pokazuje `scripts/submit_job.sh`.
 - README podaje `idle_delete_ttl = 3600s`; w kodzie (`modules/dataproc/main.tf`) jest `7200s`.
 - `.gitignore` ignoruje `*.md` i `*.json`. README jest śledzony mimo tego; nowe pliki Markdown/JSON (w tym ten plik i `.claude/settings.json`) wymagają `git add -f`. Pliki `prezentacja*.md` wymienione w README istnieją tylko lokalnie u autora.
 

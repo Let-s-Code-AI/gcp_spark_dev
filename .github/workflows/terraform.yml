@@ -227,15 +227,29 @@ jobs:
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Upload PySpark script to GCS
-        run: |
-          gsutil cp scripts/word_count.py \
-            gs://${{ secrets.GCP_PROJECT_ID }}-spark-staging-dev/scripts/word_count.py
+      # Wrapper wyłączony, bo dokleja własne linie do stdout i psuje
+      # `terraform output -raw` w podstawieniu $(...)
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
 
-      - name: Submit PySpark job
+      # Init tylko po to, żeby odczytać outputy ze state (nic nie zapisuje)
+      - name: Terraform Init
+        working-directory: ${{ env.WORKING_DIR }}
         run: |
-          gcloud dataproc jobs submit pyspark \
-            gs://${{ secrets.GCP_PROJECT_ID }}-spark-staging-dev/scripts/word_count.py \
-            --cluster=spark-training-cluster \
-            --region=europe-central2 \
-            --project=${{ secrets.GCP_PROJECT_ID }}
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="prefix=terraform/state"
+
+      # Nazwy bucketu i klastra bierzemy z outputów — bucket ma w nazwie hash,
+      # więc nie da się go złożyć ręcznie. Skrypt wgrywa word_count.py i dane
+      # wejściowe do bucketu data i przekazuje jobowi argumenty input/output.
+      - name: Submit PySpark job
+        env:
+          PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          DATA_BUCKET="$(terraform -chdir="$WORKING_DIR" output -raw data_bucket)"
+          CLUSTER="$(terraform -chdir="$WORKING_DIR" output -raw cluster_name)"
+          bash scripts/submit_job.sh "$PROJECT_ID" europe-central2 "$CLUSTER" "$DATA_BUCKET"
