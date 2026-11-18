@@ -73,7 +73,7 @@
           },
           "promQLQuery": {
             "projectName": "__PROJECT_ID__",
-            "expr": "1 - avg by (instance) (rate(system_cpu_time_seconds_total{state=\"idle\"}[5m]))",
+            "expr": "1 - sum by (instance) (rate(system_cpu_time_seconds_total{state=\"idle\"}[5m])) / sum by (instance) (system_cpu_logical_count)",
             "step": "60s"
           }
         }
