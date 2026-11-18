@@ -22,6 +22,12 @@ locals {
 
   grafana_files_dir = "${path.module}/files/grafana"
   grafana_files     = fileset(local.grafana_files_dir, "**")
+
+  # Treść plików po podstawieniu project_id — znana już na etapie planu
+  grafana_content = {
+    for f in local.grafana_files :
+    f => replace(file("${local.grafana_files_dir}/${f}"), "__PROJECT_ID__", var.project_id)
+  }
 }
 
 # ─── OpenTelemetry Collector na węzłach Dataproc ─────────────────────────────
@@ -107,7 +113,7 @@ resource "google_storage_bucket_object" "grafana_provisioning" {
 
   name    = each.value
   bucket  = google_storage_bucket.grafana_provisioning.name
-  content = replace(file("${local.grafana_files_dir}/${each.value}"), "__PROJECT_ID__", var.project_id)
+  content = local.grafana_content[each.value]
 }
 
 resource "google_storage_bucket_iam_member" "grafana_provisioning_viewer" {
@@ -178,12 +184,15 @@ resource "google_cloud_run_v2_service" "grafana" {
         value = "/etc/grafana/provisioning/dashboards/json/spark-cluster.json"
       }
       # Zmiana plików provisioningu wymusza nową rewizję (Grafana czyta
-      # datasource tylko przy starcie)
+      # datasource tylko przy starcie). Hash liczony z treści lokalnych plików,
+      # a nie z atrybutu md5hash obiektów w GCS — provider podaje w planie
+      # starą wartość md5hash, co kończy się błędem "Provider produced
+      # inconsistent final plan" przy apply.
       env {
         name = "PROVISIONING_HASH"
         value = sha1(join(",", [
           for f in sort(tolist(local.grafana_files)) :
-          google_storage_bucket_object.grafana_provisioning[f].md5hash
+          "${f}:${md5(local.grafana_content[f])}"
         ]))
       }
 
@@ -202,7 +211,10 @@ resource "google_cloud_run_v2_service" "grafana" {
     }
   }
 
+  # Obiekty provisioningu muszą być wgrane przed startem nowej rewizji
+  # (hash nie odwołuje się już do nich, więc zależność jest jawna)
   depends_on = [
+    google_storage_bucket_object.grafana_provisioning,
     google_storage_bucket_iam_member.grafana_provisioning_viewer,
     google_project_iam_member.grafana_monitoring_viewer,
   ]
