@@ -183,9 +183,8 @@ jobs:
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Terraform Refresh
-        run: terraform refresh -var="project_id=${{ secrets.GCP_PROJECT_ID }}"
-
+      # Bez `terraform refresh` przed apply: refresh zapisuje nową wersję state,
+      # a zapisany plan jest przypięty do wersji z joba plan ("Saved plan is stale").
       - name: Download plan artifact
         uses: actions/download-artifact@v4
         with:
