@@ -51,6 +51,9 @@ resource "google_dataproc_cluster" "spark" {
 
       tags = ["dataproc-node"]
 
+      # lokalizacja artefaktów OpenTelemetry dla init action
+      metadata = var.node_metadata
+
       service_account_scopes = [
         "https://www.googleapis.com/auth/cloud-platform",
       ]
@@ -69,6 +72,12 @@ resource "google_dataproc_cluster" "spark" {
         "spark:spark.shuffle.service.enabled"   = "true"
         "dataproc:dataproc.allow.zero.workers"  = "false"
       }
+    }
+
+    # ── Init action: OpenTelemetry Collector na każdym węźle ─────────────────
+    initialization_action {
+      script      = var.init_action_uri
+      timeout_sec = 300
     }
 
     # ── Auto-wyłączenie klastra po czasie nieaktywności ──────────────────────

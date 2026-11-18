@@ -1,0 +1,16 @@
+# Datasource Grafany: Google Cloud Monitoring (obsługuje PromQL, więc czyta
+# też metryki z Managed Service for Prometheus). Uwierzytelnianie przez
+# service account usługi Cloud Run — bez kluczy.
+# __PROJECT_ID__ podmienia Terraform przy wgrywaniu pliku do GCS.
+apiVersion: 1
+
+datasources:
+  - name: Google Cloud Monitoring
+    type: stackdriver
+    uid: gcm
+    access: proxy
+    isDefault: true
+    editable: false
+    jsonData:
+      authenticationType: gce
+      defaultProject: __PROJECT_ID__

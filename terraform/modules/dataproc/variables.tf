@@ -9,3 +9,5 @@ variable "spark_version" { type = string }
 variable "subnet_self_link" { type = string }
 variable "staging_bucket" { type = string }
 variable "service_account" { type = string }
+variable "init_action_uri" { type = string }
+variable "node_metadata" { type = map(string) }

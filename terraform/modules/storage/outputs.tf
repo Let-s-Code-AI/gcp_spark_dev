@@ -9,3 +9,7 @@ output "data_bucket_name" {
 output "dataproc_sa_email" {
   value = google_service_account.dataproc_sa.email
 }
+
+output "name_suffix" {
+  value = local.suffix
+}

@@ -56,3 +56,9 @@ variable "spark_version" {
   type        = string
   default     = "2.2-debian12" # Spark 3.5, Hadoop 3.3
 }
+
+variable "grafana_invokers" {
+  description = "Kto może otworzyć Grafanę (członkowie IAM, np. user:jan@example.com); Owner/Editor projektu mają dostęp bez tego"
+  type        = list(string)
+  default     = []
+}

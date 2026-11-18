@@ -1,0 +1,11 @@
+# Dashboardy jako kod: Grafana wczytuje pliki JSON z katalogu json/.
+apiVersion: 1
+
+providers:
+  - name: spark
+    folder: Spark
+    type: file
+    allowUiUpdates: false
+    updateIntervalSeconds: 60
+    options:
+      path: /etc/grafana/provisioning/dashboards/json

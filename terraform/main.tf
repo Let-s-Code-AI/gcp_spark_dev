@@ -26,6 +26,9 @@ resource "google_project_service" "apis" {
     "compute.googleapis.com",
     "storage.googleapis.com",
     "iam.googleapis.com",
+    "monitoring.googleapis.com", # Managed Service for Prometheus
+    "cloudtrace.googleapis.com",
+    "run.googleapis.com", # Grafana
   ])
 
   service            = each.value
@@ -53,6 +56,20 @@ module "storage" {
   depends_on = [google_project_service.apis]
 }
 
+module "observability" {
+  source = "./modules/observability"
+
+  project_id        = var.project_id
+  region            = var.region
+  env               = var.env
+  name_suffix       = module.storage.name_suffix
+  data_bucket       = module.storage.data_bucket_name
+  dataproc_sa_email = module.storage.dataproc_sa_email
+  grafana_invokers  = var.grafana_invokers
+
+  depends_on = [google_project_service.apis]
+}
+
 module "dataproc" {
   source = "./modules/dataproc"
 
@@ -67,6 +84,8 @@ module "dataproc" {
   subnet_self_link = module.network.subnet_self_link
   staging_bucket   = module.storage.staging_bucket_name
   service_account  = module.storage.dataproc_sa_email
+  init_action_uri  = module.observability.otel_init_action_uri
+  node_metadata    = module.observability.otel_node_metadata
 
-  depends_on = [module.network, module.storage]
+  depends_on = [module.network, module.storage, module.observability]
 }
